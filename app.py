@@ -15,32 +15,29 @@ MODEL_KNN_PATH = Path("knn/knn_face_classifier.pkl")
 PROCESS_EVERY_N = 8
 REFRESH_MS = 200
 
-RTC_CONFIGURATION = RTCConfiguration(
+# Try to load custom TURN credentials from Streamlit Secrets (mandatory for deployed cloud apps)
+ice_servers = [
     {
-        "iceServers": [
-            {
-                "urls": [
-                    "stun:stun.l.google.com:19302",
-                    "stun:stun1.l.google.com:19302",
-                    "stun:stun2.l.google.com:19302",
-                    "stun:stun3.l.google.com:19302",
-                    "stun:stun4.l.google.com:19302",
-                ]
-            }
-            # NOTE: If you deploy your app to a remote server (e.g. Streamlit Community Cloud) 
-            # and clients are behind restrictive firewalls/NATs, you will need a TURN server.
-            # Avoid using public shared/rate-limited credentials as they frequently fail.
-            # You can sign up for a free account at Metered.ca, Twilio, or Xirsys to get your own 
-            # secure TURN credentials and configure them here like this:
-            # ,
-            # {
-            #     "urls": ["turn:your-turn-server.com:443"],
-            #     "username": "your-username",
-            #     "credential": "your-credential"
-            # }
+        "urls": [
+            "stun:stun.l.google.com:19302",
+            "stun:stun1.l.google.com:19302",
+            "stun:stun2.l.google.com:19302",
+            "stun:stun3.l.google.com:19302",
+            "stun:stun4.l.google.com:19302",
         ]
     }
-)
+]
+
+has_turn_server = False
+if "TURN_URL" in st.secrets and "TURN_USERNAME" in st.secrets and "TURN_CREDENTIAL" in st.secrets:
+    ice_servers.append({
+        "urls": [st.secrets["TURN_URL"]],
+        "username": st.secrets["TURN_USERNAME"],
+        "credential": st.secrets["TURN_CREDENTIAL"]
+    })
+    has_turn_server = True
+
+RTC_CONFIGURATION = RTCConfiguration({"iceServers": ice_servers})
 
 import torch
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -302,6 +299,23 @@ def main():
             rtc_configuration=RTC_CONFIGURATION,
             media_stream_constraints={"video": True, "audio": False},
         )
+        
+        if not has_turn_server:
+            with st.expander("ℹ️ Deploying to Streamlit Cloud? Read this if the camera is stuck", expanded=False):
+                st.info(
+                    "If the camera feed stays stuck on **'Connecting...'**, it is because WebRTC requires "
+                    "a TURN server to relay video streams through cloud firewalls and NATs.\n\n"
+                    "**To solve this in 30 seconds:**\n"
+                    "1. Go to [Metered.ca](https://www.metered.ca) and sign up for a free developer account (completely free, no credit card required).\n"
+                    "2. Copy your **TURN Server details**.\n"
+                    "3. Open your deployed app on Streamlit, click **Manage App** -> **Settings** -> **Secrets**, and paste your credentials like this:\n"
+                    "```toml\n"
+                    "TURN_URL = \"turn:openrelay.metered.ca:443\"\n"
+                    "TURN_USERNAME = \"your-username\"\n"
+                    "TURN_CREDENTIAL = \"your-password\"\n"
+                    "```\n"
+                    "Once added, save the secrets and the app will reload and connect instantly!"
+                )
         
         if webrtc_ctx.video_processor:
             webrtc_ctx.video_processor.threshold = threshold
