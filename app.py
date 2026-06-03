@@ -325,23 +325,7 @@ def main():
             rtc_configuration=RTC_CONFIGURATION,
             media_stream_constraints={"video": True, "audio": False},
         )
-        
-        if not has_turn_server:
-            with st.expander("ℹ️ Deploying to Streamlit Cloud? Read this if the camera is stuck", expanded=False):
-                st.info(
-                    "If the camera feed stays stuck on **'Connecting...'**, it is because WebRTC requires "
-                    "a TURN server to relay video streams through cloud firewalls and NATs.\n\n"
-                    "**To solve this in 30 seconds:**\n"
-                    "1. Go to [Metered.ca](https://www.metered.ca) and sign up for a free developer account (completely free, no credit card required).\n"
-                    "2. Copy your **TURN Server details**.\n"
-                    "3. Open your deployed app on Streamlit, click **Manage App** -> **Settings** -> **Secrets**, and paste your credentials like this:\n"
-                    "```toml\n"
-                    "TURN_URL = \"turn:openrelay.metered.ca:443\"\n"
-                    "TURN_USERNAME = \"your-username\"\n"
-                    "TURN_CREDENTIAL = \"your-password\"\n"
-                    "```\n"
-                    "Once added, save the secrets and the app will reload and connect instantly!"
-                )
+
         
         if webrtc_ctx.video_processor:
             webrtc_ctx.video_processor.threshold = threshold
