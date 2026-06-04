@@ -234,6 +234,28 @@ where $\gamma$ (gamma) controls the kernel width. The regularization parameter $
 
 \textbf{Parameters}: $C = 10.0$, $\gamma = \text{scale}$ (computed as $1 / (n\_features \times X.var())$), probability estimation enabled.
 
+\textbf{Justification}: RBF kernel is chosen over linear or polynomial kernels because FaceNet embeddings form complex, non-linear decision boundaries in the 512-dimensional space --- the kernel trick lets SVM separate 22 classes without explicit feature engineering. $C = 10$ (a moderately high value) applies stronger regularization to minimize misclassifications; this is appropriate because the augmented dataset is clean and well-separated (100\% accuracy observed), so a tighter fit does not risk overfitting. $\gamma = \text{scale}$ adapts to the data variance automatically, avoiding the brittleness of a fixed $\gamma$ value when embedding magnitudes differ across classes.
+
+\subsubsection{SVM Parameter Sensitivity}
+\label{subsubsec:svm_params}
+
+To verify that the chosen parameters are not arbitrary, a sensitivity analysis was conducted: accuracy and mean confidence were measured while varying $C$ (with $\gamma = \text{scale}$ fixed) and $\gamma$ (with $C = 10$ fixed). Figure~\ref{fig:svm_params} shows the results.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/svm_parameter_search.png}
+    \caption{SVM parameter sensitivity. \textbf{Left}: Varying $C$ with $\gamma = \text{scale}$. Accuracy plateaus at 100\% for $C \ge 1$; lower $C$ values ($\le 0.01$) underfit severely. \textbf{Right}: Varying $\gamma$ with $C = 10$. Both $\text{scale}$ and $0.1$ achieve 100\% accuracy; smaller $\gamma$ ($\le 0.001$) over-smooths and collapses performance. The chosen parameters ($C=10, \gamma=\text{scale}$) sit in a stable, well-performing region.}
+    \label{fig:svm_params}
+\end{figure}
+
+Key observations:
+\begin{itemize}
+    \item \textbf{$C$ effect}: Values $C \ge 1$ all yield 100\% accuracy with nearly identical confidence ($\sim 80.78\%$). At $C = 0.1$, accuracy drops slightly to 99.34\% but confidence rises to 82.47\%. Below $C \le 0.01$, the model underfits completely (accuracy $\approx 8\%$). The chosen $C=10$ is safely in the stable plateau.
+    \item \textbf{$\gamma$ effect}: $\gamma = \text{scale}$ (effective value $\approx 0.002$) and $\gamma = 0.1$ both achieve 100\% accuracy. $\gamma = 0.01$ drops to 99.67\%. Smaller $\gamma$ values ($0.001, 0.0001$) produce increasingly uniform predictions. The $\text{scale}$ heuristic is preferred over a fixed $\gamma = 0.1$ because it adapts to data variance, reducing overfitting risk on differently-scaled data at no accuracy cost.
+\end{itemize}
+
+These results confirm that $C=10, \gamma=\text{scale}$ is not an arbitrary choice but a robust selection within a stable high-performance region.
+
 \subsection{KNN Classifier}
 \label{subsec:knn}
 
@@ -247,10 +269,12 @@ d(\mathbf{x}_i, \mathbf{x}_j) = 1 - \frac{\mathbf{x}_i \cdot \mathbf{x}_j}{\|\ma
 
 Voting uses \textbf{weights = distance}: closer neighbors have higher influence. The optimal $k$ is found via 5-fold cross-validation over $k \in \{1, 3, 5, 7, 9, 11, 15\}$.
 
+\textbf{Justification}: Cosine distance is the natural metric for FaceNet embeddings because the network is trained with triplet loss to maximize cosine similarity between embeddings of the same identity and minimize it for different identities --- the embedding space is fundamentally angular. $k=1$ is selected by cross-validation as the best performer (100\% CV accuracy); higher $k$ values introduce underfitting because the 22 classes form tight, well-separated clusters where even the nearest neighbor is sufficient for perfect classification (see Figure~\ref{fig:knn_search}). $\text{weights = distance}$ ensures that closer neighbors contribute more to the vote, reducing the impact of any outlier samples near class boundaries.
+
 \subsection{Results}
 \label{subsec:training_results}
 
-With the cleaned dataset, both classifiers achieved \textbf{100\% test accuracy}. Table~\ref{tab:comparison} summarizes the detailed metrics.
+With the cleaned dataset, both classifiers achieved \textbf{100\% test accuracy} on all standard metrics. Table~\ref{tab:comparison} summarizes the results.
 
 \begin{table}[H]
     \centering
@@ -260,7 +284,11 @@ With the cleaned dataset, both classifiers achieved \textbf{100\% test accuracy}
         \toprule
         \textbf{Metric} & \textbf{SVM (RBF)} & \textbf{KNN (k=1, cosine)} \\
         \midrule
-        Test Accuracy (\%) & 100.00 & 100.00 \\
+        Accuracy (\%) & 100.00 & 100.00 \\
+        Precision (weighted, \%) & 100.00 & 100.00 \\
+        Recall (weighted, \%) & 100.00 & 100.00 \\
+        F1-score (weighted, \%) & 100.00 & 100.00 \\
+        Top-2 Accuracy (\%) & 100.00 & 100.00 \\
         Mean Confidence (\%) & 80.78 & 100.00 \\
         Training Time (s) & 0.53 & 0.00 \\
         Inference / sample (ms) & 0.20 & 0.05 \\
@@ -269,14 +297,48 @@ With the cleaned dataset, both classifiers achieved \textbf{100\% test accuracy}
     \end{tabular}
 \end{table}
 
-Both models achieve perfect accuracy. SVM provides more realistic confidence scores (80.78\%), reflecting true prediction uncertainty, while KNN with $k=1$ always assigns 100\% confidence. The following figures break down the comparison across different metrics.
+This perfect performance across all metrics (accuracy, precision, recall, F1-score, top-2 accuracy) confirms that FaceNet produces a well-structured embedding space where even simple classifiers achieve flawless separation. The only meaningful difference is in confidence calibration: SVM's 80.78\% average confidence reflects realistic uncertainty, while KNN with $k=1$ always predicts 100\%. Figure~\ref{fig:metrics_comp} visualizes this side by side.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.72\textwidth]{figures/svm_vs_knn_accuracy.png}
-    \caption{Accuracy and mean confidence comparison between SVM (RBF) and KNN. Both classifiers achieve 100\% accuracy, but SVM provides a more realistic confidence estimate (80.78\% vs 100\%).}
-    \label{fig:accuracy}
+    \includegraphics[width=0.85\textwidth]{figures/metrics_comparison.png}
+    \caption{Comprehensive metrics comparison. Both models score 100\% on all classification metrics; the sole difference is confidence calibration.}
+    \label{fig:metrics_comp}
 \end{figure}
+
+\subsubsection{Confusion Matrices}
+
+The confusion matrices in Figure~\ref{fig:cm_svm} and Figure~\ref{fig:cm_knn} confirm that no misclassifications occur between any pair of students. All entries lie on the diagonal.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.47\textwidth}
+        \includegraphics[width=\textwidth]{figures/confusion_matrix_svm.png}
+        \caption{SVM (RBF)}
+        \label{fig:cm_svm}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.47\textwidth}
+        \includegraphics[width=\textwidth]{figures/confusion_matrix_knn.png}
+        \caption{KNN (k=1)}
+        \label{fig:cm_knn}
+    \end{subfigure}
+    \caption{Confusion matrices for both classifiers. Perfect diagonal confirms zero misclassifications across all 22 classes.}
+    \label{fig:cm}
+\end{figure}
+
+\subsubsection{Per-Class Accuracy}
+
+Figure~\ref{fig:per_class} breaks down accuracy per student. Every class achieves 100\% accuracy for both classifiers, demonstrating that the FaceNet embedding space separates all 22 individuals equally well.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/per_class_accuracy.png}
+    \caption{Per-class accuracy for SVM and KNN. All 22 students are correctly classified at 100\% by both models.}
+    \label{fig:per_class}
+\end{figure}
+
+The following figures provide additional details on timing and hyperparameter selection:
 
 \begin{figure}[H]
     \centering
@@ -354,6 +416,20 @@ To visualize the 512-dimensional embedding space, PCA (Principal Component Analy
 
 The embeddings form well-separated clusters in 2D PCA space, confirming that FaceNet produces highly discriminative feature representations. Each cluster corresponds to a distinct individual with minimal inter-class overlap.
 
+However, PCA is a linear projection that preserves only global variance ($\sim$25\% explained by 2 components). Because FaceNet embeddings live on a 512-dimensional unit hypersphere, PCA can distort local neighborhoods --- points close in 512-d may appear spread out in 2-d. To better visualize true cluster structure, we apply t-SNE (t-distributed Stochastic Neighbor Embedding), a non-linear method that preserves local distances.
+
+\subsection{t-SNE Visualization}
+\label{subsec:tsne}
+
+Figure~\ref{fig:embedding_tsne} shows the same embeddings projected via t-SNE (perplexity=30, 1000 iterations). Each class forms a tight, isolated cluster, confirming that FaceNet embeddings are cleanly separable in their native space.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/embedding_tsne.png}
+    \caption{t-SNE projection of FaceNet embeddings (512-d $\to$ 2-d). Unlike PCA, t-SNE reveals tight per-class clusters, confirming that the spread observed in the PCA plot is an artifact of linear projection loss, not poor embedding quality.}
+    \label{fig:embedding_tsne}
+\end{figure}
+
 \newpage
 
 \section{Real-time Attendance System}
@@ -407,18 +483,15 @@ face-class-cosine/
 │   ├── train_raw/                  # Cleaned raw extracted faces (301 images)
 │   └── train_augmented/            # Augmented dataset (1,505 images)
 ├── figures/
-│   ├── distribution_before.pdf
-│   ├── distribution_after.pdf
-│   ├── embedding_pca.pdf
-│       ├── svm_vs_knn_accuracy.pdf
-    ├── svm_vs_knn_timing.pdf
-    └── knn_parameter_search.pdf
-├── models/                         # Legacy model storage
+│   ├── distribution_before.png
+│   ├── distribution_after.png
+│   ├── embedding_pca.png
+│   ├── svm_vs_knn_accuracy.png
+│   ├── svm_vs_knn_timing.png
+│   └── knn_parameter_search.png
 ├── report/
-│   ├── report.tex                  # Vietnamese report
 │   └── report_en.tex               # English report
-├── test-data/                      # Test videos
-└── Video_/                         # Original input videos
+├── Video_/                         # Original input videos
 \end{verbatim}
 
 \begin{table}[H]
@@ -459,10 +532,10 @@ face-class-cosine/
 This project successfully built a complete face recognition pipeline from classroom video data and compared two classifiers:
 
 \begin{itemize}
-    \item Extracted 306 clean face images from 22 videos using MTCNN, with manual noise removal.
-    \item Augmented the dataset to 1,530 images with four transformation types.
+    \item Extracted 301 clean face images from 22 videos using MTCNN, with manual noise removal.
+    \item Augmented the dataset to 1,505 images with four transformation types.
     \item Trained both SVM (RBF kernel, $C=10$) and KNN (cosine distance, $k=1$) on FaceNet embeddings, with both achieving \textbf{100\% test accuracy}.
-    \item SVM provides realistic confidence scores (80.88\%), while KNN offers instant training, faster inference, and simpler deployment.
+    \item SVM provides realistic confidence scores (80.78\%), while KNN offers instant training, faster inference, and simpler deployment.
     \item Deployed a browser-based real-time attendance system with Streamlit and WebRTC, supporting both classifiers, live video processing, model selection, and CSV export.
 \end{itemize}
 

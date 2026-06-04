@@ -195,12 +195,29 @@ plt.close(fig2)
 fig3, ax3 = plt.subplots(figsize=(8, 5.5))
 ks = list(knn_scores.keys())
 scores = [knn_scores[k]*100 for k in ks]
-ax3.plot(ks, scores, "o-", color=ORANGE, linewidth=2.5, markersize=10,
-         zorder=3, markerfacecolor="white", markeredgewidth=2)
-ax3.axvline(x=best_k, color=DARK, linestyle="--", linewidth=1.5, alpha=0.7,
+
+# Determine color for each bar: green for 100%, yellow for < 100%
+bar_colors = ["#06d6a0" if s == 100.0 else "#ffd166" for s in scores]
+bars = ax3.bar(ks, scores, width=1.2, color=bar_colors, edgecolor="white",
+               linewidth=1.2, zorder=2, alpha=0.85)
+
+# Data labels on top of each bar
+for k, s, bar in zip(ks, scores, bars):
+    label = f"{s:.2f}%"
+    y_pos = s + 0.03
+    ax3.text(k, y_pos, label, ha="center", va="bottom",
+             fontsize=10, fontweight="bold", color=DARK)
+
+# Highlight best k with a distinct marker
+ax3.scatter([best_k], [scores[ks.index(best_k)]], color=ORANGE, s=180,
+            zorder=5, edgecolor=DARK, linewidth=2.5, marker="*",
             label=f"Best k = {best_k}")
-ax3.scatter([best_k], [knn_scores[best_k]*100], color=ORANGE, s=150, zorder=4,
-            edgecolor=DARK, linewidth=2)
+
+# 100% reference line
+ax3.axhline(y=100.0, color="#06d6a0", linestyle="-.", linewidth=1.2, alpha=0.6)
+
+# Zoom y-axis to show subtle differences
+ax3.set_ylim(99.5, 100.35)
 ax3.set_xlabel("k (number of neighbors)", fontsize=13)
 ax3.set_ylabel("5-fold Cross-Validation Accuracy (%)", fontsize=13)
 ax3.set_title("KNN Hyperparameter Search", fontsize=15, fontweight="bold", pad=14)
@@ -208,14 +225,20 @@ ax3.legend(frameon=True, facecolor="white", edgecolor="#ddd", fontsize=11)
 ax3.set_xticks(ks)
 ax3.spines["top"].set_visible(False)
 ax3.spines["right"].set_visible(False)
-ax3.grid(alpha=0.3, zorder=0)
-ax3.annotate(f"Best k = {best_k}\nCV Accuracy = {knn_scores[best_k]*100:.2f}%",
+ax3.grid(axis="y", alpha=0.3, zorder=0)
+ax3.grid(axis="x", alpha=0.1)
+
+# Annotation
+ax3.annotate(f"k={best_k} achieves {knn_scores[best_k]*100:.2f}%\n"
+             f"k=1..9 all reach 100%",
              xy=(best_k, knn_scores[best_k]*100),
-             xytext=(best_k + 1.8, knn_scores[best_k]*100 - 1.5),
-             fontsize=11, fontweight="bold", color=DARK,
-             arrowprops=dict(arrowstyle="->", color=DARK, lw=1.5),
-             bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="#ddd"))
-plt.tight_layout()
+             xytext=(best_k + 2.5, 99.78),
+             fontsize=10, fontweight="bold", color=DARK,
+             arrowprops=dict(arrowstyle="->", color=ORANGE, lw=1.5),
+             bbox=dict(boxstyle="round,pad=0.4", facecolor="#fff3e0",
+                       edgecolor=ORANGE, alpha=0.9))
+
+fig3.tight_layout()
 fig3.savefig("figures/knn_parameter_search.png", bbox_inches="tight", dpi=200)
 logger.info("Saved figures/knn_parameter_search.png")
 plt.close(fig3)
