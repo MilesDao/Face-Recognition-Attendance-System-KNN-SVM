@@ -9,9 +9,7 @@ face-class-cosine/
 ├── models/                       # Directory containing all trained models
 │   ├── svm_face_classifier.pkl   #   Trained SVM model (100% accuracy)
 │   └── knn_face_classifier.pkl   #   Trained KNN model (100% accuracy)
-├── extract_faces.py              # Face extraction from videos using MTCNN
-├── augment_data.py               # Data augmentation (contrast, blur, rotation, flip)
-├── analyze_distribution.py       # Generate PCA plot and data distribution figures
+├── prepare_data.ipynb            # Data preparation pipeline (extraction, augmentation, analysis)
 ├── train.py                      # Unified model training, caching, and comparison script
 ├── train.ipynb                   # Jupyter notebook version of the training script
 ├── app.py                        # Streamlit WebRTC real-time attendance app
@@ -71,17 +69,11 @@ pip install -r requirements.txt
 ## Training
 
 ```bash
-# Extract faces from videos (if not already done)
-python extract_faces.py
-
-# Augment dataset (if not already done)
-python augment_data.py
+# Run the cells in prepare_data.ipynb to prepare and analyze the dataset
+# (This extracts faces from videos, augments them, and plots distributions)
 
 # Train both SVM and KNN, cache embeddings, and generate all comparison figures
-python train.py
-
-# Regenerate analysis figures (PCA, distributions)
-python analyze_distribution.py
+python train.py  # Or run the train.ipynb notebook
 ```
 
 ## Run
